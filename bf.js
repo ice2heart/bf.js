@@ -4,7 +4,7 @@ const fs = require('fs');
 const argv = require('minimist')(process.argv.slice(2));
 const prompt = require('prompt-sync')();
 
-const mem = new Array(3000000);
+const mem = new Buffer(3000000);
 mem.fill(0);
 
 var position = 0;
@@ -27,12 +27,7 @@ const prettyPrint = function() {
     console.log("");
 };
 
-
 while (exec < prog.length) {
-
-    /*if(mem[position] < 0){
-        process.exit();
-    }*/
     //prettyPrint();
     switch (prog[exec]) {
         case '+':
@@ -49,7 +44,6 @@ while (exec < prog.length) {
             break;
         case '.':
             process.stdout.write(String.fromCharCode(mem[position]));
-            //console.log(String.fromCharCode(mem[position]));
             break;
         case ',':
             var p = prompt("");
@@ -58,26 +52,19 @@ while (exec < prog.length) {
             } else {
                 mem[position] = p.charCodeAt(0);
             }
-            //console.log(mem[position]);
             break;
         case '[':
             if (mem[position] === 0) {
                 var inner = 0;
                 var found = true;
-                //console.log('Start', exec, prog[exec]);
                 exec++;
                 while (found) {
-                    //console.log('Step', prog[exec]);
-
                     if (prog[exec] === '[') {
-                        //console.log('Inner start!', exec, prog[exec]);
                         inner++;
                     }
                     if (inner === 0 && prog[exec] === ']') {
-                        //console.log('End!', exec, prog[exec]);
                         found = false;
                     } else if (inner > 0 && prog[exec] === ']') {
-                        //console.log('Inner end!', exec, prog[exec]);
                         inner--;
                     }
 
@@ -89,14 +76,11 @@ while (exec < prog.length) {
 
                 }
                 exec--;
-                //console.log('Pos in end!', exec, prog[exec]);
             } else {
-                //console.log('Push to rangeStack', rangeStack);
                 rangeStack.push(exec);
             }
             break;
         case ']':
-            //console.log(rangeStack);
             if (mem[position] === 0) {
                 rangeStack.pop();
             } else {
@@ -105,7 +89,6 @@ while (exec < prog.length) {
                     process.exit();
                 }
                 exec = rangeStack[rangeStack.length - 1];
-                //console.log(exec);
             }
             break;
         default:
@@ -115,6 +98,5 @@ while (exec < prog.length) {
         console.error('Status carrupted', exec, position, rangeStack);
         process.exit();
     }
-    //prompt("Step");
     exec++;
 }
