@@ -103,6 +103,8 @@ for (var i = 0; i < resultLine.length; i++) {
   line += '.';
 }
 console.log(`size is ${line.length}`);
+// Hack remoce <>
+line = line.replace(/<>/g, "");
 var outFilename = 'out.b';
 if (argv.o){
   outFilename = argv.o
