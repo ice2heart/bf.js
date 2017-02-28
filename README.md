@@ -6,7 +6,7 @@ Simple bf interpreter and text to bf code app. It's require node.js >= 6.9.0
 ## How to install
 
 ```
-git clone git@github.com:ice2heart/bf.js.git; cd bf.js
+git clone git@github.com:ice2heart/bf.js.git; cd bf.js; npm i
 ```
 
 ## How to use interpreter
