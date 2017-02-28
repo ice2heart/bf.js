@@ -8,6 +8,7 @@ const right = '>';
 const plus = '+';
 const minus = '-';
 
+
 var resultLine = argv._.join(" ");
 
 if (argv.f) {
@@ -16,30 +17,29 @@ if (argv.f) {
 
 const euclidean = function(a, b) {
   return Math.sqrt(Math.pow(a - b, 2));
-}
+};
 
 const euclideanSqr = function(a, b) {
   return Math.pow(a - b, 2);
-}
+};
 
 var analysis = function(line) {
   var temp = [];
-  for (var i in line) {
+  for (let i in line) {
     temp.push(line.charCodeAt(i));
   }
   //find clasters
   var distances = [];
-  let item;
-  while (item = temp.shift()) {
+  for (let item of temp){
     if (item === -1)
       continue;
     let distance = [parseInt(item)];
-    for (var i = 0; i < temp.length; i++) {
+    for (let i = 0; i < temp.length; i++) {
       let d = euclideanSqr(parseInt(item), parseInt(temp[i]));
       if (d < 30) {
         distance.push(parseInt(temp[i]));
         temp[i] = -1;
-      };
+      }
     }
     distances.push(distance);
   }
@@ -53,43 +53,43 @@ var analysis = function(line) {
   }, this);
 
   return rms;
-}
+};
+
+const findNearest = function(chars, number) {
+  var pos = chars.lastIndexOf(number);
+  if (pos !== -1) {
+    return pos;
+  }
+  var nearest = 0;
+  var distance = 255;
+  for (var i = 0; i < chars.length; i++) {
+    let temp = euclidean(chars[i], number);
+    if (temp < distance) {
+      distance = temp;
+      nearest = i;
+    }
+  }
+  return nearest;
+};
 
 const origCharTable = analysis(resultLine);
-const variousCharTable = combinations(origCharTable);
-console.log(variousCharTable);
-var finalLine;
-variousCharTable.forEach((charTable) => {
-  var line = "";
-  var charPos = []
+const variousCharTables = combinations(origCharTable);
+var finalProgram;
+variousCharTables.forEach((charTable) => {
+  console.log(`Current charTable is ${charTable}`);
+  var line = '';
+  var charPos = [];
   var memPos = 0;
-  for (char of charTable) {
+  for (let char of charTable) {
     line += numbers[char];
     charPos.push(parseInt(char));
     line += ">";
     ++memPos;
   }
 
-  const findNearest = function(number) {
-    var pos = charPos.lastIndexOf(number);
-    if (pos !== -1) {
-      return pos;
-    }
-    var nearest = 0;
-    var distance = 255;
-    for (var i = 0; i < charPos.length; i++) {
-      let temp = euclidean(charPos[i], number);
-      if (temp < distance) {
-        distance = temp;
-        nearest = i;
-      }
-    }
-    return nearest;
-  }
-
   for (var i = 0; i < resultLine.length; i++) {
     let currentNumber = resultLine.charCodeAt(i);
-    var pos = findNearest(currentNumber);
+    var pos = findNearest(charPos, currentNumber);
     var shift = memPos - pos;
     if (shift > 0) {
       line += left.repeat(shift);
@@ -109,16 +109,13 @@ variousCharTable.forEach((charTable) => {
   }
 
   // Hack remoce <>
-  line = line.replace(/<>/g, "");
-  console.log(line.length);
-  if (!finalLine || finalLine.length > line.length)
-    finalLine = line;
+  line = line.replace(/<>/g, '');
+  console.log(`Current program legth is ${line.length}`);
+  if (!finalProgram || finalProgram.length > line.length)
+    finalProgram = line;
 });
 
-var outFilename = 'out.b';
-if (argv.o) {
-  outFilename = argv.o
-}
+var outFilename = argv.o || 'out.b';
 
-console.log(`size is ${finalLine.length}`);
-fs.writeFile(outFilename, finalLine);
+console.log(`Final size is ${finalProgram.length} byte, out filename ${outFilename}`);
+fs.writeFile(outFilename, finalProgram);

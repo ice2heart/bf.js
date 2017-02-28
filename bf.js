@@ -4,6 +4,12 @@ const fs = require('fs');
 const argv = require('minimist')(process.argv.slice(2));
 const prompt = require('prompt-sync')();
 
+class BfExec {
+  constructor() {
+
+  }
+}
+
 const mem = new Buffer(3000000);
 mem.fill(0);
 
@@ -90,7 +96,6 @@ while (exec < prog.length) {
             process.exit();
           }
           exec++;
-
         }
         exec--;
       } else {

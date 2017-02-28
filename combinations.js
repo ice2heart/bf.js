@@ -3,11 +3,10 @@ function make(arr, el) {
   var len = arr.length;
   var res = [];
 
-  for(i = len; i >= 0; i--) {
+  for (i = len; i >= 0; i--) {
     res.push(
       ([]).concat(
-        arr.slice(0, i),
-        [el],
+        arr.slice(0, i), [el],
         arr.slice(i, i_m)
       )
     );
@@ -16,24 +15,28 @@ function make(arr, el) {
   return res;
 }
 
+
+
 function combinations(arr) {
-	console.log(arr)
   var prev, curr, el, i;
   var len = arr.length;
 
-  curr = [[arr[0]]];
+  curr = [
+    [arr[0]]
+  ];
 
-  for(i = 1; i < len; i++) {
+  for (i = 1; i < len; i++) {
     el = arr[i];
     prev = curr;
     curr = [];
 
-    prev.forEach(function(item) {
+    for (let item of prev) {
       curr = curr.concat(
         make(item, el)
       );
-    });
+    }
   }
-	return curr;
+  return curr;
 }
+
 module.exports = combinations;
