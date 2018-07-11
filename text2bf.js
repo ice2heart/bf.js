@@ -120,4 +120,5 @@ variousCharTables.forEach((charTable) => {
 var outFilename = argv.o || 'out.b';
 
 console.log(`Final size is ${finalProgram.length} byte, out filename ${outFilename}`);
-fs.writeFile(outFilename, finalProgram);
+console.log(finalProgram)
+fs.writeFile(outFilename, finalProgram, (err) => {if (err) console.error(err);});

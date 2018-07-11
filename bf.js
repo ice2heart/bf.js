@@ -6,7 +6,7 @@ const prompt = require('prompt-sync')();
 
 class BfExec {
   constructor(program, maxCycleCount) {
-    this.mem = new Buffer(3000000);
+    this.mem = new Buffer.alloc(3000000);
     this.mem.fill(0);
 
     this.position = 0;
