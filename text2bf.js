@@ -38,7 +38,7 @@ var analysis = function(line) {
     let distance = [parseInt(item)];
     for (let i = 0; i < temp.length; i++) {
       let d = euclideanSqr(parseInt(item), parseInt(temp[i]));
-      if (d < 30) {
+      if (d < 100) {
         distance.push(parseInt(temp[i]));
         temp[i] = -1;
       }
@@ -75,10 +75,14 @@ const findNearest = function(chars, number) {
 };
 
 const origCharTable = analysis(resultLine);
+console.log(origCharTable, origCharTable.length);
 const variousCharTables = combinations(origCharTable);
+// variousCharTables = [origCharTable];
+console.log("step2");
+
 var finalProgram;
 variousCharTables.forEach((charTable) => {
-  console.log(`Current charTable is ${charTable}`);
+  // console.log(`Current charTable is ${charTable}`);
   var line = '';
   var charPos = [];
   var memPos = 0;
@@ -112,13 +116,13 @@ variousCharTables.forEach((charTable) => {
 
   // Hack remoce <>
   line = line.replace(/<>/g, '');
-  console.log(`Current program legth is ${line.length}`);
+  // console.log(`Current program legth is ${line.length}`);
   if (!finalProgram || finalProgram.length > line.length)
     finalProgram = line;
 });
 
 var outFilename = argv.o || 'out.b';
 
+console.log(finalProgram);
 console.log(`Final size is ${finalProgram.length} byte, out filename ${outFilename}`);
-console.log(finalProgram)
 fs.writeFile(outFilename, finalProgram, (err) => {if (err) console.error(err);});
