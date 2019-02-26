@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
@@ -24,17 +26,33 @@ class Item:
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        return f'{self.type}: {self.args}'
+
+
 def i2t(item):
     # item to text
     line = ''
     if isinstance(item, int):
-        line = str(item)
+        if item >= 0:
+            line = str(item)
+        else:
+            line = f'({str(item)})'
+    elif isinstance(item, float):
+        if item >= 0:
+            line = str(item)
+        else:
+            line = f'({str(item)})'
     elif item.type is '>':
         line = f'mem_point = mem_point + {item.args[0]}'
     elif item.type is '<':
         line = f'mem_point = mem_point - {item.args[0]}'
     elif item.type is '.':
         line = f'p({item.args[0]})'
+        # line += ';print(mem[:40])'
     elif item.type is '+':
         line = f'add(mem_point, {item.args[0]})'
     elif item.type is '-':
@@ -42,19 +60,26 @@ def i2t(item):
     elif item.type is 'clear':
         line = 'mem[mem_point] = 0'
     elif item.type is ',':
-        line = 'mem[mem_point] = ord(input(\'>\'))'
+        line = 'mem[mem_point] = read()'
     elif item.type is EQUALITY:
         line = f'{i2t(item.args[0])}={i2t(item.args[1])}'
+        # line += ';print(mem[:40]);input();'
     elif item.type is PLUS:
-        line = f'(({i2t(item.args[0])}+{i2t(item.args[1])})& 0xFF )'
+        line = f'(int({i2t(item.args[0])}+{i2t(item.args[1])})& 0xFF )'
+    elif item.type is SUB:
+        line = f'(int({i2t(item.args[0])}-{i2t(item.args[1])})& 0xFF )'
     elif item.type is RELATIVE_POINTER:
-        line = f'mem[mem_point+({item.args[0]})]'
+        if isinstance(item.args[0], int) and item.args[0] is 0:
+            line = f'mem[mem_point]'
+        else:
+            line = f'mem[mem_point+{i2t(item.args[0])}]'
     elif item.type is MULTIPLICATION:
         line = f'{i2t(item.args[0])}*{i2t(item.args[1])}'
     else:
         breakpoint()
         raise Exception(f'unknown symbol {item.type}')
     return line
+
 
 def process_branch(branch, shift):
     text = ''
@@ -70,16 +95,24 @@ def process_branch(branch, shift):
         line = i2t(i)
         # print(line)
         text += ' ' * shift + line + '\n'
+        # text += ' ' * shift + 'print(mem[:40]);input()\n'
     return text
 
 
 def generate_python(ast):
-    text = '''mem = [0] * 3000
+    text = '''mem = [0] * 30000
 mem_point = 0
 def add(point, val):
     mem[point] = (mem[point] + val) & 0xFF
 def p(times):
     print(chr(mem[mem_point]) * times, end=\'\')
+def read():
+    i=0
+    try:
+        i=ord(input(\'>\'))
+    except TypeError:
+        pass
+    return i
 '''
     shift = 0
     text += process_branch(ast, shift)
@@ -108,15 +141,16 @@ def remove_repetitions(branch):
                 count -= 1
     return branch
 
+
 def unwind(branch):
     while True:
         index = -1
-        for pos,i in enumerate(branch.args):
+        for pos, i in enumerate(branch.args):
             if i.type is UNWIND:
                 index = pos
-                break;
+                break
         if index is -1:
-            break;
+            break
         item = branch.args.pop(index)
         branch.args[index:index] = item.args
     return branch
@@ -125,7 +159,7 @@ def unwind(branch):
 def loop_multiplication(branch):
     branch.args = list(filter(lambda x: x is not None, branch.args))
     for i in branch.args:
-        if i.type is CYCLE:
+        if i.type is CYCLE or i.type is '.':
             return branch
     move_sum = 0
     for i in branch.args:
@@ -146,41 +180,67 @@ def loop_multiplication(branch):
             if relative_counter not in operanads:
                 operanads[relative_counter] = i
             else:
-                raise Exception('adding elements')
+                if operanads[relative_counter].type == i.type:
+                    # print('same', operanads[relative_counter], i)
+                    operanads[relative_counter].args[0] += i.args[0]
+                else:
+                    print(operanads[relative_counter])
+                    raise Exception('type mismatch')
     new_branch = Item(type='unwind', args=[])
     direction = -1
-    if operanads.pop(0).type is '+':
+    step = operanads.pop(0)
+    if step.type is '+':
         direction = 1
 
     for o in operanads.keys():
+        r_type = PLUS
+        if operanads[o].type is '-':
+            r_type = SUB
         if direction is -1:
             item = Item(type=EQUALITY, args=[
+                Item(type=RELATIVE_POINTER, args=[o]),
+                Item(type=r_type, args=[
                     Item(type=RELATIVE_POINTER, args=[o]),
-                    Item(type=PLUS, args=[
-                        Item(type=RELATIVE_POINTER, args=[o]),
+                    Item(type=MULTIPLICATION, args=[
+                        Item(type=RELATIVE_POINTER, args=[0]),
                         Item(type=MULTIPLICATION, args=[
-                            Item(type=RELATIVE_POINTER, args=[0]),
-                            operanads[o].args[0]
+                            operanads[o].args[0],
+                            (1 / step.args[0])
                         ])
                     ])
                 ])
+            ])
             new_branch.args.append(item)
         else:
-            # print(f'mem[point+({o})] += (255 - mem[point]) * {operanads[o].args[0]}')
-            # item = Item(type=PLUS, args=[
-            #     Item(type=RELATIVE_POINTER, args=[o]),
-            #     Item(type=RELATIVE_POINTER, args=[o]),
-            #     Item(type=MULTIPLICATION, args=[
-            #         Item(type=SUB, args=[255, Item(type=RELATIVE_POINTER, args=[0])]),
-            #         operanads[o].args[0]
-            #     ])])
-            raise Exception('not emplimented')
+            # print(f'mem[point+({o})] += (255 - mem[point]) * {operanads[o].args[0]} * (1/step)')
+            item = Item(type=EQUALITY, args=[
+                Item(type=RELATIVE_POINTER, args=[o]),
+                Item(type=r_type, args=[
+                    Item(type=SUB, args=[
+                        255,
+                        Item(type=RELATIVE_POINTER, args=[o])
+                    ]),
+                    Item(type=MULTIPLICATION, args=[
+                        Item(type=RELATIVE_POINTER, args=[0]),
+                        Item(type=MULTIPLICATION, args=[
+                            operanads[o].args[0],
+                            (1 / step.args[0])
+                        ])
+                    ])
+                ])
+            ])
+            # raise Exception('not emplimented')
             new_branch.args.append(item)
-        print(operanads[o].type, o, operanads[o].args[0])
+        # print(operanads[o].type, o, operanads[o].args[0])
     new_branch.args.append(Item(type='clear'))
-    print('zero', [i.type for i in new_branch.args], [i.type for i in branch.args])
-    # print(branch)
+    print('multi', new_branch, branch)
     return new_branch
+
+
+def clear_branch(branch):
+    branch.args = list(filter(lambda x: x is not None, branch.args))
+    branch = unwind(branch)
+    return branch
 
 
 def optimize_branch(branch):
@@ -189,8 +249,10 @@ def optimize_branch(branch):
     if len(branch.args) == 0:
         return None
     branch = remove_repetitions(branch)
-    branch.args = list(filter(lambda x: x is not None, branch.args))
-    # branch = loop_multiplication(branch)
+    branch = clear_branch(branch)
+    branch = loop_multiplication(branch)
+    # loop_multiplication(branch)
+    branch = clear_branch(branch)
     for pos, i in enumerate(branch.args):
         if i is None:
             continue
@@ -198,12 +260,13 @@ def optimize_branch(branch):
             i = optimize_branch(i)
             branch.args[pos] = i
             continue
-    branch = unwind(branch)
-    branch.args = list(filter(lambda x: x is not None, branch.args))
+    branch = clear_branch(branch)
     return branch
 
 
 def optimize_ast(ast):
+    if ast is None:
+        raise Exception('no program')
     ast = optimize_branch(ast)
     return ast
 
@@ -231,7 +294,7 @@ def main():
         item = Item(parent=parent, args=[1], type=code_item)
         parent.args.append(item)
     ast = optimize_ast(ast)
-    # pp.pprint(vars(ast))
+    # pp.pprint(ast)
     text = generate_python(ast)
     with open('prog.py', 'w') as file:
         file.write(text)
