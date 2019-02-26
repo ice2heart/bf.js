@@ -234,12 +234,30 @@ def loop_multiplication(branch):
         # print(operanads[o].type, o, operanads[o].args[0])
     new_branch.args.append(Item(type='clear'))
     print('multi', new_branch, branch)
+    new_branch = symplify_multiplication(new_branch)
     return new_branch
 
 
 def clear_branch(branch):
     branch.args = list(filter(lambda x: x is not None, branch.args))
     branch = unwind(branch)
+    return branch
+
+
+def symplify_multiplication(branch):
+    for pos, item in enumerate(branch.args):
+        if isinstance(item, int) or isinstance(item, float):
+            pass
+        elif item.type is MULTIPLICATION:
+            item = symplify_multiplication(item)
+            if (isinstance(item.args[1], int) or isinstance(item.args[1], float)) and int(item.args[1]) is 1:
+                # print('optimize1', item.args[1])
+                branch.args[pos]=item.args[0]
+            elif (isinstance(item.args[0], int) or isinstance(item.args[0], float)) and int(item.args[0]) is 1:
+                # print('optimize0', item.args[0])
+                branch.args[pos]=item.args[1]
+        else:
+            item = symplify_multiplication(item)
     return branch
 
 
@@ -251,8 +269,8 @@ def optimize_branch(branch):
     branch = remove_repetitions(branch)
     branch = clear_branch(branch)
     branch = loop_multiplication(branch)
-    # loop_multiplication(branch)
     branch = clear_branch(branch)
+    
     for pos, i in enumerate(branch.args):
         if i is None:
             continue
