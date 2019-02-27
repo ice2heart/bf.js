@@ -3,6 +3,7 @@
 import argparse
 import pprint
 from collections import OrderedDict
+from copy import copy
 pp = pprint.PrettyPrinter(indent=2)
 
 SYMBLS = ['+', '-', '>', '<', '[', ']', '.', ',']
@@ -54,7 +55,7 @@ def i2t(item):
     elif item.type is '<':
         line = f'mem_point = mem_point - {item.args[0]}'
     elif item.type is PRINT:
-        line = f'p({item.args[0]}, {i2t(item.args[1])})'
+        line = f'p({i2t(item.args[0])}, {i2t(item.args[1])})'
     elif item.type is '+':
         line = f'add(mem_point, {item.args[0]})'
     elif item.type is '-':
@@ -157,9 +158,9 @@ def unwind(branch):
 
 
 def loop_multiplication(branch):
-    branch.args = list(filter(lambda x: x is not None, branch.args))
+    # branch.args = list(filter(lambda x: x is not None, branch.args))
     for i in branch.args:
-        if i.type is CYCLE or i.type is '.':
+        if i.type is CYCLE:
             return branch
     move_sum = 0
     for i in branch.args:
@@ -168,6 +169,7 @@ def loop_multiplication(branch):
         if i.type is '<':
             move_sum -= i.args[0]
     if move_sum is not 0:
+        print(f'can be optimize {move_sum} {branch}')
         return branch
     relative_counter = 0
     operanads = OrderedDict()
@@ -181,26 +183,33 @@ def loop_multiplication(branch):
                 operanads[relative_counter] = i
             else:
                 if operanads[relative_counter].type == i.type:
-                    # print('same', operanads[relative_counter], i)
+                    print('same', operanads[relative_counter], i)
+                    print(branch)
                     operanads[relative_counter].args[0] += i.args[0]
                 else:
                     print(operanads[relative_counter])
                     raise Exception('type mismatch')
     new_branch = Item(type='unwind', args=[])
-    direction = -1
+
     step = operanads.pop(0)
-    if step.type is '+':
-        direction = 1
 
     for o in operanads.keys():
-        r_type = PLUS
-        if operanads[o].type is '-':
-            r_type = SUB
-        if direction is -1:
+        item = None
+        
+        if operanads[o].type is '+' or operanads[o].type is '-':
+            r_type = PLUS
+            if operanads[o].type is '-':
+                r_type = SUB
+            base_value = Item(type=RELATIVE_POINTER, args=[o])
+            if step.type is '+':
+                base_value = Item(type=SUB, args=[
+                    255,
+                    Item(type=RELATIVE_POINTER, args=[o])
+                ])
             item = Item(type=EQUALITY, args=[
                 Item(type=RELATIVE_POINTER, args=[o]),
                 Item(type=r_type, args=[
-                    Item(type=RELATIVE_POINTER, args=[o]),
+                    base_value,
                     Item(type=MULTIPLICATION, args=[
                         Item(type=RELATIVE_POINTER, args=[0]),
                         Item(type=MULTIPLICATION, args=[
@@ -210,28 +219,25 @@ def loop_multiplication(branch):
                     ])
                 ])
             ])
-            new_branch.args.append(item)
+        elif operanads[o].type is PRINT:
+            base_value = Item(type=RELATIVE_POINTER, args=[0])
+            if step.type is '+':
+                base_value = Item(type=SUB, args=[
+                    255,
+                    Item(type=RELATIVE_POINTER, args=[0])
+                ])
+            item = Item(type=PRINT, args=[None, operanads[o].args[1]])
+            item.args[1].args[0] += o
+            item.args[0] = Item(type=MULTIPLICATION, args=[
+                operanads[o].args[0],
+                Item(type=MULTIPLICATION, args=[
+                    base_value,
+                    (1 / step.args[0])
+                ])
+            ])
         else:
-            # print(f'mem[point+({o})] += (255 - mem[point]) * {operanads[o].args[0]} * (1/step)')
-            item = Item(type=EQUALITY, args=[
-                Item(type=RELATIVE_POINTER, args=[o]),
-                Item(type=r_type, args=[
-                    Item(type=SUB, args=[
-                        255,
-                        Item(type=RELATIVE_POINTER, args=[o])
-                    ]),
-                    Item(type=MULTIPLICATION, args=[
-                        Item(type=RELATIVE_POINTER, args=[0]),
-                        Item(type=MULTIPLICATION, args=[
-                            operanads[o].args[0],
-                            (1 / step.args[0])
-                        ])
-                    ])
-                ])
-            ])
-            # raise Exception('not emplimented')
-            new_branch.args.append(item)
-        # print(operanads[o].type, o, operanads[o].args[0])
+            raise Exception('panic!')
+        new_branch.args.append(item)
     new_branch.args.append(Item(type='clear'))
     # print('multi', new_branch, branch)
     new_branch = symplify_multiplication(new_branch)
@@ -267,7 +273,7 @@ def optimize_branch(branch):
     branch = remove_repetitions(branch)
     branch = clear_branch(branch)
     branch = loop_multiplication(branch)
-    branch = clear_branch(branch)
+    # branch = clear_branch(branch)
     for pos, i in enumerate(branch.args):
         if i is None:
             continue
@@ -312,7 +318,7 @@ def main():
         parent.args.append(item)
     # pp.pprint(ast)
     ast = optimize_ast(ast)
-    pp.pprint(ast)
+    # pp.pprint(ast)
     text = generate_python(ast)
     with open('prog.py', 'w') as file:
         file.write(text)
