@@ -2,9 +2,11 @@
 
 import argparse
 import pprint
+from collections import OrderedDict
 pp = pprint.PrettyPrinter(indent=2)
 
 SYMBLS = ['+', '-', '>', '<', '[', ']', '.', ',']
+REPITABLE = ['+', '-', '>', '<', '.']
 CYCLE = 'cycle'
 MULTIPLICATION = 'multi'
 EQUALITY = 'eq'
@@ -12,6 +14,7 @@ PLUS = 'plus'
 SUB = 'substraction'
 RELATIVE_POINTER = 'rpoint'
 UNWIND = 'unwind'
+PRINT = '.'
 
 
 class Item:
@@ -50,9 +53,8 @@ def i2t(item):
         line = f'mem_point = mem_point + {item.args[0]}'
     elif item.type is '<':
         line = f'mem_point = mem_point - {item.args[0]}'
-    elif item.type is '.':
-        line = f'p({item.args[0]})'
-        # line += ';print(mem[:40])'
+    elif item.type is PRINT:
+        line = f'p({item.args[0]}, {i2t(item.args[1])})'
     elif item.type is '+':
         line = f'add(mem_point, {item.args[0]})'
     elif item.type is '-':
@@ -93,9 +95,7 @@ def process_branch(branch, shift):
             text += process_branch(i, shift)
             continue
         line = i2t(i)
-        # print(line)
         text += ' ' * shift + line + '\n'
-        # text += ' ' * shift + 'print(mem[:40]);input()\n'
     return text
 
 
@@ -104,8 +104,8 @@ def generate_python(ast):
 mem_point = 0
 def add(point, val):
     mem[point] = (mem[point] + val) & 0xFF
-def p(times):
-    print(chr(mem[mem_point]) * times, end=\'\')
+def p(times, char):
+    print(chr(char) * times, end=\'\')
 def read():
     i=0
     try:
@@ -124,7 +124,7 @@ def remove_repetitions(branch):
         count = 1
         if i is None:
             continue
-        if i.type is CYCLE:
+        if i.type not in REPITABLE:
             continue
         try:
             while True:
@@ -134,7 +134,7 @@ def remove_repetitions(branch):
                     break
         except IndexError:
             pass
-        branch.args[pos].args = [count]
+        branch.args[pos].args[0] = count
         if count > 1:
             while count != 1:
                 branch.args[pos+count-1] = None
@@ -170,7 +170,7 @@ def loop_multiplication(branch):
     if move_sum is not 0:
         return branch
     relative_counter = 0
-    operanads = {}
+    operanads = OrderedDict()
     for i in branch.args:
         if i.type is '>':
             relative_counter += i.args[0]
@@ -233,7 +233,7 @@ def loop_multiplication(branch):
             new_branch.args.append(item)
         # print(operanads[o].type, o, operanads[o].args[0])
     new_branch.args.append(Item(type='clear'))
-    print('multi', new_branch, branch)
+    # print('multi', new_branch, branch)
     new_branch = symplify_multiplication(new_branch)
     return new_branch
 
@@ -251,11 +251,9 @@ def symplify_multiplication(branch):
         elif item.type is MULTIPLICATION:
             item = symplify_multiplication(item)
             if (isinstance(item.args[1], int) or isinstance(item.args[1], float)) and int(item.args[1]) is 1:
-                # print('optimize1', item.args[1])
-                branch.args[pos]=item.args[0]
+                branch.args[pos] = item.args[0]
             elif (isinstance(item.args[0], int) or isinstance(item.args[0], float)) and int(item.args[0]) is 1:
-                # print('optimize0', item.args[0])
-                branch.args[pos]=item.args[1]
+                branch.args[pos] = item.args[1]
         else:
             item = symplify_multiplication(item)
     return branch
@@ -270,7 +268,6 @@ def optimize_branch(branch):
     branch = clear_branch(branch)
     branch = loop_multiplication(branch)
     branch = clear_branch(branch)
-    
     for pos, i in enumerate(branch.args):
         if i is None:
             continue
@@ -310,9 +307,12 @@ def main():
             parent = parent.parent
             continue
         item = Item(parent=parent, args=[1], type=code_item)
+        if item.type is PRINT:
+            item.args.append(Item(type=RELATIVE_POINTER, args=[0]))
         parent.args.append(item)
-    ast = optimize_ast(ast)
     # pp.pprint(ast)
+    ast = optimize_ast(ast)
+    pp.pprint(ast)
     text = generate_python(ast)
     with open('prog.py', 'w') as file:
         file.write(text)
