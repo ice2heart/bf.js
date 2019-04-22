@@ -37,155 +37,87 @@ class Item:
         return f'{self.type}: {self.args}'
 
 
-def i2t(item):
-    # item to text
-    line = ''
-    if isinstance(item, int):
-        if item >= 0:
-            line = str(item)
+class CodeGenerator:
+    def i2t(self, item):
+        line = ''
+        return line
+
+    def process_branch(self, branch, shift):
+        return ''
+
+    def generate(self, ast):
+        return ''
+
+
+class JavaGenerator(CodeGenerator):
+    def i2t(self, item):
+        # item to text
+        line = ''
+        if isinstance(item, int):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif isinstance(item, float):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif item.type is '>':
+            line = f'index += {item.args[0]};'
+        elif item.type is '<':
+            line = f'index -= {item.args[0]};'
+        elif item.type is PRINT:
+            line = f'System.out.print(repeatChar((char) {self.i2t(item.args[1])}, {self.i2t(item.args[0])}));'
+            # line = f'p({self.i2t(item.args[0])}, {self.i2t(item.args[1])})'
+        elif item.type is '+':
+            line = f'x[index] += {item.args[0]};'
+        elif item.type is '-':
+            line = f'x[index] -= {item.args[0]};'
+        elif item.type is 'clear':
+            line = f'{self.i2t(item.args[0])} = 0;'
+        elif item.type is ',':
+            line = 'x[index] = (byte) sc.next().charAt(0);'
+        elif item.type is EQUALITY:
+            line = f'{self.i2t(item.args[0])}=(byte)({self.i2t(item.args[1])});'
+            # line += ';print(mem[:40]);input();'
+        elif item.type is PLUS:
+            line = f'{self.i2t(item.args[0])}+{self.i2t(item.args[1])}'
+        elif item.type is SUB:
+            line = f'{self.i2t(item.args[0])}-{self.i2t(item.args[1])}'
+        elif item.type is RELATIVE_POINTER:
+            if isinstance(item.args[0], int) and item.args[0] is 0:
+                line = 'x[index]'
+            else:
+                line = f'x[index+{self.i2t(item.args[0])}]'
+        elif item.type is MULTIPLICATION:
+            line = f'{self.i2t(item.args[0])}*{self.i2t(item.args[1])}'
+            if isinstance(item.args[0], float) or isinstance(item.args[1], float):
+                line = f'(byte) ({line})'
         else:
-            line = f'({str(item)})'
-    elif isinstance(item, float):
-        if item >= 0:
-            line = str(item)
-        else:
-            line = f'({str(item)})'
-    elif item.type is '>':
-        line = f'mem_point = mem_point + {item.args[0]}'
-    elif item.type is '<':
-        line = f'mem_point = mem_point - {item.args[0]}'
-    elif item.type is PRINT:
-        line = f'p({i2t(item.args[0])}, {i2t(item.args[1])})'
-    elif item.type is '+':
-        line = f'add(mem_point, {item.args[0]})'
-    elif item.type is '-':
-        line = f'add(mem_point, -{item.args[0]})'
-    elif item.type is 'clear':
-        line = f'{i2t(item.args[0])} = 0'
-    elif item.type is ',':
-        line = 'mem[mem_point] = read()'
-    elif item.type is EQUALITY:
-        line = f'{i2t(item.args[0])}={i2t(item.args[1])}'
-        # line += ';print(mem[:40]);input();'
-    elif item.type is PLUS:
-        line = f'(int({i2t(item.args[0])}+{i2t(item.args[1])})& 0xFF )'
-    elif item.type is SUB:
-        line = f'(int({i2t(item.args[0])}-{i2t(item.args[1])})& 0xFF )'
-    elif item.type is RELATIVE_POINTER:
-        if isinstance(item.args[0], int) and item.args[0] is 0:
-            line = f'mem[mem_point]'
-        else:
-            line = f'mem[mem_point+{i2t(item.args[0])}]'
-    elif item.type is MULTIPLICATION:
-        line = f'{i2t(item.args[0])}*{i2t(item.args[1])}'
-    else:
-        breakpoint()
-        raise Exception(f'unknown symbol {item.type}')
-    return line
+            breakpoint()
+            raise Exception(f'unknown symbol {item.type}')
+        return line
 
+    def process_branch(self, branch, shift):
+        text = ''
+        if branch.type is CYCLE:
+            line = 'while (x[index] != 0) {'
+            text += ' ' * shift + line + '\n'
+            shift += 4
 
-def process_branch(branch, shift):
-    text = ''
-    if branch.type is CYCLE:
-        line = 'while mem[mem_point] != 0:'
-        text += ' ' * shift + line + '\n'
-        shift += 2
+        for i in branch.args:
+            if i.type is CYCLE:
+                text += self.process_branch(i, shift)
+                continue
+            line = self.i2t(i)
+            text += ' ' * shift + line + '\n'
+        if branch.type is CYCLE:
+            text += ' ' * (shift-4) + '}\n'
+        return text
 
-    for i in branch.args:
-        if i.type is CYCLE:
-            text += process_branch(i, shift)
-            continue
-        line = i2t(i)
-        text += ' ' * shift + line + '\n'
-    return text
-
-def i2t_j(item):
-    # item to text
-    line = ''
-    if isinstance(item, int):
-        if item >= 0:
-            line = str(item)
-        else:
-            line = f'({str(item)})'
-    elif isinstance(item, float):
-        if item >= 0:
-            line = str(item)
-        else:
-            line = f'({str(item)})'
-    elif item.type is '>':
-        line = f'index += {item.args[0]};'
-    elif item.type is '<':
-        line = f'index -= {item.args[0]};'
-    elif item.type is PRINT:
-        line = f'System.out.print(repeatChar((char) {i2t_j(item.args[1])}, {i2t_j(item.args[0])}));'
-        # line = f'p({i2t_j(item.args[0])}, {i2t_j(item.args[1])})'
-    elif item.type is '+':
-        line = f'x[index] += {item.args[0]};'
-    elif item.type is '-':
-        line = f'x[index] -= {item.args[0]};'
-    elif item.type is 'clear':
-        line = f'{i2t_j(item.args[0])} = 0;'
-    elif item.type is ',':
-        line = 'x[index] = (byte) sc.next().charAt(0);'
-    elif item.type is EQUALITY:
-        line = f'{i2t_j(item.args[0])}=(byte)({i2t_j(item.args[1])});'
-        # line += ';print(mem[:40]);input();'
-    elif item.type is PLUS:
-        line = f'{i2t_j(item.args[0])}+{i2t_j(item.args[1])}'
-    elif item.type is SUB:
-        line = f'{i2t_j(item.args[0])}-{i2t_j(item.args[1])}'
-    elif item.type is RELATIVE_POINTER:
-        if isinstance(item.args[0], int) and item.args[0] is 0:
-            line = 'x[index]'
-        else:
-            line = f'x[index+{i2t_j(item.args[0])}]'
-    elif item.type is MULTIPLICATION:
-        line = f'{i2t_j(item.args[0])}*{i2t_j(item.args[1])}'
-        if isinstance(item.args[0], float) or isinstance(item.args[1], float):
-            line = f'(byte) ({line})'
-    else:
-        breakpoint()
-        raise Exception(f'unknown symbol {item.type}')
-    return line
-
-def process_branch_java(branch, shift):
-    text = ''
-    if branch.type is CYCLE:
-        line = 'while (x[index] != 0) {'
-        text += ' ' * shift + line + '\n'
-        shift += 4
-
-    for i in branch.args:
-        if i.type is CYCLE:
-            text += process_branch_java(i, shift)
-            continue
-        line = i2t_j(i)
-        text += ' ' * shift + line + '\n'
-    if branch.type is CYCLE:
-        text += ' ' * (shift-4)  + '}\n'
-    return text
-
-def generate_python(ast):
-    text = '''mem = [0] * 30000
-mem_point = 0
-def add(point, val):
-    mem[point] = (mem[point] + val) & 0xFF
-def p(times, char):
-    print(chr(char) * times, end=\'\')
-def read():
-    i=0
-    try:
-        i=ord(input(\'>\'))
-    except TypeError:
-        pass
-    return i
-'''
-    shift = 0
-    text += process_branch(ast, shift)
-    return text
-
-def generate_java(ast):
-    text = '''
+    def generate(self, ast):
+        text = '''
 import java.util.Scanner;
 import java.util.Arrays;
 
@@ -203,12 +135,183 @@ public class Main {
             x[xc] = 0;
         int index = 0;
 '''
-    shift = 8
-    text += process_branch_java(ast, shift)
-    text +='''
+        shift = 8
+        text += self.process_branch(ast, shift)
+        text += '''
     }
 }'''
-    return text
+        return text
+
+class CGenerator(CodeGenerator):
+    def i2t(self, item):
+        # item to text
+        line = ''
+        if isinstance(item, int):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif isinstance(item, float):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif item.type is '>':
+            line = f'index += {item.args[0]};'
+        elif item.type is '<':
+            line = f'index -= {item.args[0]};'
+        elif item.type is PRINT:
+            line = f'repeat({self.i2t(item.args[1])}, {self.i2t(item.args[0])});'
+        elif item.type is '+':
+            line = f'x[index] += {item.args[0]};'
+        elif item.type is '-':
+            line = f'x[index] -= {item.args[0]};'
+        elif item.type is 'clear':
+            line = f'{self.i2t(item.args[0])} = 0;'
+        elif item.type is ',':
+            line = 'x[index] = (char) sc.next().charAt(0);'
+        elif item.type is EQUALITY:
+            line = f'{self.i2t(item.args[0])}=(char)({self.i2t(item.args[1])});'
+            # line += ';print(mem[:40]);input();'
+        elif item.type is PLUS:
+            line = f'{self.i2t(item.args[0])}+{self.i2t(item.args[1])}'
+        elif item.type is SUB:
+            line = f'{self.i2t(item.args[0])}-{self.i2t(item.args[1])}'
+        elif item.type is RELATIVE_POINTER:
+            if isinstance(item.args[0], int) and item.args[0] is 0:
+                line = 'x[index]'
+            else:
+                line = f'x[index+{self.i2t(item.args[0])}]'
+        elif item.type is MULTIPLICATION:
+            line = f'{self.i2t(item.args[0])}*{self.i2t(item.args[1])}'
+            if isinstance(item.args[0], float) or isinstance(item.args[1], float):
+                line = f'(char) ({line})'
+        else:
+            breakpoint()
+            raise Exception(f'unknown symbol {item.type}')
+        return line
+
+    def process_branch(self, branch, shift):
+        text = ''
+        if branch.type is CYCLE:
+            line = 'while (x[index] != 0) {'
+            text += ' ' * shift + line + '\n'
+            shift += 4
+
+        for i in branch.args:
+            if i.type is CYCLE:
+                text += self.process_branch(i, shift)
+                continue
+            line = self.i2t(i)
+            text += ' ' * shift + line + '\n'
+        if branch.type is CYCLE:
+            text += ' ' * (shift-4) + '}\n'
+        return text
+
+    def generate(self, ast):
+        text = '''
+#include <stdio.h>
+
+void repeat(char c, int num) {
+	for (int i=0; i< num; ++i){
+		putchar(c);
+	}
+}
+        
+int main() {
+    char x[32768] = { 0 };
+    int index = 0;
+
+'''
+        shift = 4
+        text += self.process_branch(ast, shift)
+        text += '''
+    return 0;
+}'''
+        return text
+
+class PythonGenerator(CodeGenerator):
+
+    def i2t(self, item):
+        # item to text
+        line = ''
+        if isinstance(item, int):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif isinstance(item, float):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif item.type is '>':
+            line = f'mem_point = mem_point + {item.args[0]}'
+        elif item.type is '<':
+            line = f'mem_point = mem_point - {item.args[0]}'
+        elif item.type is PRINT:
+            line = f'p({self.i2t(item.args[0])}, {self.i2t(item.args[1])})'
+        elif item.type is '+':
+            line = f'add(mem_point, {item.args[0]})'
+        elif item.type is '-':
+            line = f'add(mem_point, -{item.args[0]})'
+        elif item.type is 'clear':
+            line = f'{self.i2t(item.args[0])} = 0'
+        elif item.type is ',':
+            line = 'mem[mem_point] = read()'
+        elif item.type is EQUALITY:
+            line = f'{self.i2t(item.args[0])}={self.i2t(item.args[1])}'
+            # line += ';print(mem[:40]);input();'
+        elif item.type is PLUS:
+            line = f'(int({self.i2t(item.args[0])}+{self.i2t(item.args[1])})& 0xFF )'
+        elif item.type is SUB:
+            line = f'(int({self.i2t(item.args[0])}-{self.i2t(item.args[1])})& 0xFF )'
+        elif item.type is RELATIVE_POINTER:
+            if isinstance(item.args[0], int) and item.args[0] is 0:
+                line = f'mem[mem_point]'
+            else:
+                line = f'mem[mem_point+{self.i2t(item.args[0])}]'
+        elif item.type is MULTIPLICATION:
+            line = f'{self.i2t(item.args[0])}*{self.i2t(item.args[1])}'
+        else:
+            breakpoint()
+            raise Exception(f'unknown symbol {item.type}')
+        return line
+
+    def process_branch(self, branch, shift):
+        text = ''
+        if branch.type is CYCLE:
+            line = 'while mem[mem_point] != 0:'
+            text += ' ' * shift + line + '\n'
+            shift += 2
+
+        for i in branch.args:
+            if i.type is CYCLE:
+                text += self.process_branch(i, shift)
+                continue
+            line = self.i2t(i)
+            text += ' ' * shift + line + '\n'
+        return text
+
+    def generate(self, ast):
+        text = '''mem = [0] * 30000
+mem_point = 0
+def add(point, val):
+    mem[point] = (mem[point] + val) & 0xFF
+def p(times, char):
+    print(chr(char) * times, end=\'\')
+def read():
+    i=0
+    try:
+        i=ord(input(\'>\'))
+    except TypeError:
+        pass
+    return i
+'''
+        shift = 0
+        text += self.process_branch(ast, shift)
+        return text
+
 
 def remove_repetitions(branch):
     for pos, i in enumerate(branch.args):
@@ -257,6 +360,7 @@ def update_relative_pointer(branch, shift):
             i = update_relative_pointer(i, shift)
     return branch
 
+
 def loop_multiplication(branch):
     # branch.args = list(filter(lambda x: x is not None, branch.args))
     for i in branch.args:
@@ -280,7 +384,7 @@ def loop_multiplication(branch):
         elif i.type is '<':
             relative_counter -= i.args[0]
         else:
-            operanads.append((relative_counter,i))
+            operanads.append((relative_counter, i))
 
     step = [i for i in operanads if i[0] is 0]
     operanads = [i for i in operanads if i[0] is not 0]
@@ -358,7 +462,8 @@ def loop_multiplication(branch):
         else:
             raise Exception(f'panic! {operand.type}')
         new_branch.args.append(item)
-    new_branch.args.append(Item(type='clear', args=[Item(type=RELATIVE_POINTER, args=[0])]))
+    new_branch.args.append(
+        Item(type='clear', args=[Item(type=RELATIVE_POINTER, args=[0])]))
     # print('multi', new_branch, branch)
     new_branch = symplify_multiplication(new_branch)
     return new_branch
@@ -439,11 +544,17 @@ def main():
     # pp.pprint(ast)
     ast = optimize_ast(ast)
     # pp.pprint(ast)
-    java_code = generate_java(ast)
+    java_generator = JavaGenerator()
+    java_code = java_generator.generate(ast)
     with open('jt/Main.java', 'w') as file:
         file.write(java_code)
-    text = generate_python(ast)
+    python_generator = PythonGenerator()
+    text = python_generator.generate(ast)
     with open('prog.py', 'w') as file:
+        file.write(text)
+    c_generator = CGenerator()
+    text = c_generator.generate(ast)
+    with open('c/main.c', 'w') as file:
         file.write(text)
     # print(text)
 
