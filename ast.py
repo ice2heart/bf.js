@@ -142,6 +142,7 @@ public class Main {
 }'''
         return text
 
+
 class CGenerator(CodeGenerator):
     def i2t(self, item):
         # item to text
@@ -229,6 +230,173 @@ int main() {
     return 0;
 }'''
         return text
+
+
+class VariableCounter:
+    variables = {}
+
+    def __getitem__(self, key):
+        if key not in self.variables:
+            self.variables[key] = 0
+        return f'{key}.{self.variables[key]}'
+
+    def __contains__(self, key):
+        return kei in self.variables
+
+    def set(self, key):
+        if key not in self.variables:
+            self.variables[key] = 0
+        else:
+            self.variables[key] += 1
+        return f'{key}.{self.variables[key]}'
+
+
+v = VariableCounter()
+
+
+class LLVMGenerator(CodeGenerator):
+
+    def i2t(self, item):
+        # item to text
+        line = ''
+        if isinstance(item, int):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif isinstance(item, float):
+            if item >= 0:
+                line = str(item)
+            else:
+                line = f'({str(item)})'
+        elif item.type is '>':
+            line = f'''
+  %{v.set('pointer_value')} = load i64, i64* %{v['pointer_ptr']}, align 8
+  %{v.set('pointer_value_result')} = add i64 %{v['pointer_value']}, {item.args[0]}
+  store i64 %{v['pointer_value_result']}, i64* %{v['pointer_ptr']}, align 8
+'''
+        elif item.type is '<':
+            line = f'''
+  %{v.set('pointer_value')} = load i64, i64* %{v['pointer_ptr']}, align 8
+  %{v.set('pointer_value_result')} = sub i64 %{v['pointer_value']}, {item.args[0]}
+  store i64 %{v['pointer_value_result']}, i64* %{v['pointer_ptr']}, align 8
+'''
+        elif item.type is PRINT:
+            line = f'repeat({self.i2t(item.args[1])}, {self.i2t(item.args[0])});'
+            line = f'''
+  %{v.set('pointer_value')} = load i64, i64* %{v['pointer_ptr']}, align 8
+  %{v.set('data_val_ptr')} = getelementptr inbounds [4000 x i8], [4000 x i8]* %{v['data_ptr']}, i64 0, i64 %{v['pointer_value']}
+  %{v.set('data_val')} = load i8, i8* %{v['data_val_ptr']}, align 1
+  %{v.set('data_val_ext')} = zext i8 %{v['data_val']} to i32
+  %{v.set('call_putchar')} = tail call i32 @putchar(i32 %{v['data_val_ext']})
+'''
+        elif item.type is '+':
+            line = f'''
+  %{v.set('pointer_value')} = load i64, i64* %{v['pointer_ptr']}, align 8
+  %{v.set('data_val_ptr')} = getelementptr inbounds [4000 x i8], [4000 x i8]* %{v['data_ptr']}, i64 0, i64 %{v['pointer_value']}
+  %{v.set('data_val')} = load i8, i8* %{v['data_val_ptr']}, align 1
+  %{v.set('data_val_result')} = add i8 %{v['data_val']}, {item.args[0]}
+  store i8 %{v['data_val_result']}, i8* %{v['data_val_ptr']}, align 1
+'''
+        elif item.type is '-':
+                        line = f'''
+  %{v.set('pointer_value')} = load i64, i64* %{v['pointer_ptr']}, align 8
+  %{v.set('data_val_ptr')} = getelementptr inbounds [4000 x i8], [4000 x i8]* %{v['data_ptr']}, i64 0, i64 %{v['pointer_value']}
+  %{v.set('data_val')} = load i8, i8* %{v['data_val_ptr']}, align 1
+  %{v.set('data_val_result')} = sub i8 %{v['data_val']}, {item.args[0]}
+  store i8 %{v['data_val_result']}, i8* %{v['data_val_ptr']}, align 1
+'''
+        elif item.type is 'clear':
+            line = f'{self.i2t(item.args[0])} = 0;'
+            line = f'''
+
+  %{v.set('pointer_value')} = load i64, i64* %{v['pointer_ptr']}, align 8
+  %{v.set('data_val_ptr')} = getelementptr inbounds [4000 x i8], [4000 x i8]* %{v['data_ptr']}, i64 0, i64 %{v['pointer_value']}
+  store i8 0, i8* %{v['data_val_ptr']}, align 1
+'''
+        elif item.type is ',':
+            line = 'x[index] = (char) sc.next().charAt(0);'
+        elif item.type is EQUALITY:
+            line = f'{self.i2t(item.args[0])}=(char)({self.i2t(item.args[1])});'
+            # line += ';print(mem[:40]);input();'
+        elif item.type is PLUS:
+            line = f'{self.i2t(item.args[0])}+{self.i2t(item.args[1])}'
+        elif item.type is SUB:
+            line = f'{self.i2t(item.args[0])}-{self.i2t(item.args[1])}'
+        elif item.type is RELATIVE_POINTER:
+            if isinstance(item.args[0], int) and item.args[0] is 0:
+                line = 'x[index]'
+            else:
+                line = f'x[index+{self.i2t(item.args[0])}]'
+        elif item.type is MULTIPLICATION:
+            line = f'{self.i2t(item.args[0])}*{self.i2t(item.args[1])}'
+            if isinstance(item.args[0], float) or isinstance(item.args[1], float):
+                line = f'(char) ({line})'
+        else:
+            breakpoint()
+            raise Exception(f'unknown symbol {item.type}')
+        return line
+
+    def process_branch(self, branch, shift):
+        text = ''
+        
+        if branch.type is CYCLE:
+            loop_entry = v.set('loop_entry')
+            loop_body = v.set('loop_body')
+            loop_end = v.set('loop_end')
+            text = f'''
+  br label %{loop_entry}
+{loop_entry}:
+  %{v.set('pointer_value')} = load i64, i64* %{v['pointer_ptr']}, align 8
+  %{v.set('data_val_ptr')} = getelementptr inbounds [4000 x i8], [4000 x i8]* %{v['data_ptr']}, i64 0, i64 %{v['pointer_value']}
+  %{v.set('data_val')} = load i8, i8* %{v['data_val_ptr']}
+  %{v.set('cmp_res')} = icmp eq i8 %{v['data_val']}, 0
+  br i1 %{v['cmp_res']}, label %{loop_end}, label %{loop_body}
+
+{loop_body}:
+'''
+            text += '\n'
+
+        for i in branch.args:
+            if i.type is CYCLE:
+                text += self.process_branch(i, shift)
+                continue
+            line = self.i2t(i)
+            text += ' ' * shift + line + '\n'
+        if branch.type is CYCLE:
+            text += f'''
+  br label %{loop_entry}
+{loop_end}:\n'''
+        return text
+
+    def generate(self, ast):
+        text = f'''
+define i32 @main() #0 {{
+  ; uint8_t data[4000];
+  %{v.set('data_ptr')} = alloca [4000 x i8], align 16
+  %{v.set('pointer_ptr')} = alloca i64, align 4
+  ; указатель масива на 0
+  ; pointer = 0
+  store i64 0, i64* %{v['pointer_ptr']}, align 8
+
+  ; чистим массив
+  %{v.set('data_dest')} = bitcast [4000 x i8]* %{v['data_ptr']} to i8*
+  call void @llvm.memset.p0i8.i64(i8* %{v['data_dest']}, i8 0, i64 4000, i32 16, i1 false)
+
+'''
+        shift = 2
+        text += self.process_branch(ast, shift)
+        text += f'''
+  %{v.set('call_putchar')} = tail call i32 @putchar(i32 13)
+  ret i32 0
+}}
+
+declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
+declare i32 @putchar(i32) local_unnamed_addr #1
+declare i32 @getchar() local_unnamed_addr #1
+'''
+        return text
+
 
 class PythonGenerator(CodeGenerator):
 
@@ -542,19 +710,23 @@ def main():
             item.args.append(Item(type=RELATIVE_POINTER, args=[0]))
         parent.args.append(item)
     # pp.pprint(ast)
-    ast = optimize_ast(ast)
-    # pp.pprint(ast)
-    java_generator = JavaGenerator()
-    java_code = java_generator.generate(ast)
-    with open('jt/Main.java', 'w') as file:
-        file.write(java_code)
-    python_generator = PythonGenerator()
-    text = python_generator.generate(ast)
-    with open('prog.py', 'w') as file:
-        file.write(text)
-    c_generator = CGenerator()
-    text = c_generator.generate(ast)
-    with open('c/main.c', 'w') as file:
+    # ast = optimize_ast(ast)
+    pp.pprint(ast)
+    # java_generator = JavaGenerator()
+    # java_code = java_generator.generate(ast)
+    # with open('jt/Main.java', 'w') as file:
+    #     file.write(java_code)
+    # python_generator = PythonGenerator()
+    # text = python_generator.generate(ast)
+    # with open('prog.py', 'w') as file:
+    #     file.write(text)
+    # c_generator = CGenerator()
+    # text = c_generator.generate(ast)
+    # with open('c/main.c', 'w') as file:
+    #     file.write(text)
+    llvm_generator = LLVMGenerator()
+    text = llvm_generator.generate(ast)
+    with open('main.ll', 'w') as file:
         file.write(text)
     # print(text)
 
