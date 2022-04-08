@@ -4,6 +4,7 @@ import argparse
 import pprint
 from collections import OrderedDict
 from copy import copy
+import os
 pp = pprint.PrettyPrinter(indent=2)
 
 SYMBLS = ['+', '-', '>', '<', '[', ']', '.', ',']
@@ -387,7 +388,7 @@ define i32 @main() #0 {{
         shift = 2
         text += self.process_branch(ast, shift)
         text += f'''
-  %{v.set('call_putchar')} = tail call i32 @putchar(i32 13)
+  %{v.set('call_putchar')} = tail call i32 @putchar(i32 10)
   ret i32 0
 }}
 
@@ -712,21 +713,23 @@ def main():
     # pp.pprint(ast)
     # ast = optimize_ast(ast)
     pp.pprint(ast)
-    # java_generator = JavaGenerator()
-    # java_code = java_generator.generate(ast)
-    # with open('jt/Main.java', 'w') as file:
-    #     file.write(java_code)
+    file_base = os.path.basename(args.filename).split('.')[:1][0]
+    java_generator = JavaGenerator()
+    java_code = java_generator.generate(ast)
+    with open('jt/Main.java', 'w') as file:
+        file.write(java_code)
     # python_generator = PythonGenerator()
     # text = python_generator.generate(ast)
     # with open('prog.py', 'w') as file:
     #     file.write(text)
-    # c_generator = CGenerator()
-    # text = c_generator.generate(ast)
-    # with open('c/main.c', 'w') as file:
-    #     file.write(text)
+    c_generator = CGenerator()
+    text = c_generator.generate(ast)
+    with open('c/main.c', 'w') as file:
+        file.write(text)
     llvm_generator = LLVMGenerator()
     text = llvm_generator.generate(ast)
-    with open('main.ll', 'w') as file:
+
+    with open(f'llvm/{file_base}.ll', 'w') as file:
         file.write(text)
     # print(text)
 
